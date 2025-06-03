@@ -44,9 +44,6 @@ next-env.d.ts
 **/.ipynb_checkpoints
 
 
-# Firebase config
-/src/lib/firebase.js
-
 
 # Ignore virtual environment
 .venv310/

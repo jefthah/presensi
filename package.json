@@ -1,0 +1,39 @@
+{
+  "name": "prototype-leads",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "ngrok": "ngrok http --domain=bee-guiding-snipe.ngrok-free.app 8000",
+    "dev:with-ngrok": "concurrently \"npm run ngrok\" \"npm run dev\"",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@mediapipe/camera_utils": "^0.3.1675466862",
+    "@mediapipe/face_mesh": "^0.4.1633559619",
+    "@tensorflow-models/face-landmarks-detection": "^1.0.6",
+    "@tensorflow/tfjs": "^4.22.0",
+    "cors": "^2.8.5",
+    "face-api.js": "^0.22.2",
+    "firebase": "^11.4.0",
+    "firebase-admin": "^13.4.0",
+    "js-cookie": "^3.0.5",
+    "next": "^14.2.24",
+    "nodemailer": "^7.0.3",
+    "react": "^18",
+    "react-dom": "^18",
+    "react-hot-toast": "^2.5.2",
+    "react-icons": "^5.5.0",
+    "react-webcam": "^7.2.0",
+    "send": "^1.1.0",
+    "undici": "^7.4.0"
+  },
+  "devDependencies": {
+    "eslint": "^8",
+    "eslint-config-next": "14.2.13",
+    "postcss": "^8",
+    "tailwindcss": "^3.4.1"
+  }
+}

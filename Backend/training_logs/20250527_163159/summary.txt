@@ -1,0 +1,30 @@
+Training Summary - 20250527_163159
+==================================================
+Number of classes: 5
+Optimal K value: 6
+Accuracy: 1.0000
+Precision (macro): 1.0000
+Recall (macro): 1.0000
+F1 Score (macro): 1.0000
+
+Class-wise metrics:
+2110511151:
+  Precision: 1.0000
+  Recall: 1.0000
+  F1: 1.0000
+2110511152:
+  Precision: 1.0000
+  Recall: 1.0000
+  F1: 1.0000
+2110511160:
+  Precision: 1.0000
+  Recall: 1.0000
+  F1: 1.0000
+2210511025:
+  Precision: 1.0000
+  Recall: 1.0000
+  F1: 1.0000
+2210511043:
+  Precision: 1.0000
+  Recall: 1.0000
+  F1: 1.0000

@@ -36,9 +36,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# public assets (optional kalau auto generate, kalau static aman)
-/public/
-
 
 # jupyter notebook checkpoints
 **/.ipynb_checkpoints

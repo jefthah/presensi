@@ -105,10 +105,13 @@ const FaceRecognitionContent = () => {
 
       const data = await response.json();
       const predicted = data?.predicted_label || "Tidak dikenali";
-      const conf = data?.confidence ? (data.confidence * 100).toFixed(2) : "0.00";
+      const conf = data?.confidence
+        ? (data.confidence * 100).toFixed(2)
+        : "0.00";
       const confidenceNum = parseFloat(conf);
       const match = data?.match || false;
-      const isActuallyMatch = match && predicted === userNIM && confidenceNum >= 70;
+      const isActuallyMatch =
+        match && predicted === userNIM && confidenceNum >= 70;
 
       setResultLabel(predicted);
       setConfidence(conf);
@@ -129,7 +132,16 @@ const FaceRecognitionContent = () => {
       setIsMatch(false);
       setHasScanned(true);
     }
-  }, [userNIM, hasSubmitted, matkul, pertemuan, absensi, attempts, metodePresensi, router]);
+  }, [
+    userNIM,
+    hasSubmitted,
+    matkul,
+    pertemuan,
+    absensi,
+    attempts,
+    metodePresensi,
+    router,
+  ]);
 
   const handleSuccessfulRecognition = async (blob) => {
     setHasSubmitted(true);
@@ -205,6 +217,23 @@ const FaceRecognitionContent = () => {
               : "presensi langsung",
         });
 
+        // Log response
+        const responseLog = {
+          status: "Presensi berhasil disimpan",
+          student: {
+            nim: userNIM,
+            faceFilename: `${timestamp}.jpg`,
+            roomFilename: roomUploaded ? `${timestamp}.jpg` : null,
+            location: finalLocation,
+            presensiMethod: metodePresensi, // Menambahkan metode presensi yang sudah didefinisikan
+          },
+          time: new Date().toISOString(),
+        };
+
+        // Log keberhasilan presensi
+        console.log("Presensi Log:", JSON.stringify(responseLog, null, 2)); // Log in JSON format
+
+        // Kirim notifikasi email
         await sendEmailNotification();
         alert("Presensi berhasil. Foto tersimpan.");
         router.push(
@@ -230,9 +259,9 @@ const FaceRecognitionContent = () => {
     } else {
       alert("Gagal mencocokan wajah, kembali ke halaman presensi");
       router.push(
-        `/mahasiswa/absensi/${encodeURIComponent(
-          matkul
-        )}/${encodeURIComponent(pertemuan)}/${encodeURIComponent(absensi)}`
+        `/mahasiswa/absensi/${encodeURIComponent(matkul)}/${encodeURIComponent(
+          pertemuan
+        )}/${encodeURIComponent(absensi)}`
       );
     }
   };
@@ -338,7 +367,13 @@ const FaceRecognitionContent = () => {
 // Komponen wrapper dengan Suspense
 const FaceRecognitionPage = () => {
   return (
-    <Suspense fallback={<div className="flex justify-center items-center h-screen">Memuat...</div>}>
+    <Suspense
+      fallback={
+        <div className="flex justify-center items-center h-screen">
+          Memuat...
+        </div>
+      }
+    >
       <FaceRecognitionContent />
     </Suspense>
   );

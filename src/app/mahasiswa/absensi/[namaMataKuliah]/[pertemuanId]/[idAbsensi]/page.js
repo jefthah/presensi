@@ -17,13 +17,13 @@ const allowedZones = [
     name: "Gedung Dewi Sartika UPNVJ",
     lat: -6.31628,
     lng: 106.79463,
-    radius: 70,
+    radius: 40,
   },
   {
     name: "Fakultas Ilmu Komputer UPNVJ",
     lat: -6.31605,
     lng: 106.79496,
-    radius: 70,
+    radius: 40,
   },
 ];
 
@@ -73,31 +73,6 @@ const AbsensiDetail = ({ params }) => {
     }
   }, []);
 
-  const handleCheckWifi = async () => {
-    setCheckingIP(true);
-    setWifiStatus(null);
-    try {
-      const res = await fetch("/api/get-client-ip");
-      const data = await res.json();
-      const userIP = data.ip;
-
-      const ipValid = ipInSubnet(userIP, "111.95.16.0", 24);
-
-      if (ipValid) {
-        setIsInCampus(true);
-        setWifiStatus(
-          `📍 Terdeteksi IP WiFi kampus (${userIP}). Anda terhubung WiFi kampus.`
-        );
-      } else {
-        setWifiStatus(`❌ IP publik Anda (${userIP}) bukan IP WiFi kampus.`);
-      }
-    } catch {
-      setWifiStatus("❌ Gagal memeriksa IP publik WiFi kampus.");
-    } finally {
-      setCheckingIP(false);
-    }
-  };
-
   const ipInSubnet = (ip, subnet, mask) => {
     const ipToNum = (ip) =>
       ip.split(".").reduce((acc, oct) => (acc << 8) + parseInt(oct, 10), 0) >>>
@@ -107,6 +82,41 @@ const AbsensiDetail = ({ params }) => {
     const maskNum = ~((1 << (32 - mask)) - 1) >>> 0;
 
     return (ipNum & maskNum) === (subnetNum & maskNum);
+  };
+
+  const handleCheckWifi = async () => {
+    setCheckingIP(true);
+    setWifiStatus(null);
+    try {
+      const res = await fetch("/api/get-client-ip");
+      const data = await res.json();
+      const userIP = data.ip;
+
+      // Menambahkan subnet yang diizinkan
+      const validSubnets = [
+        { subnet: "111.95.16.80", mask: 24 }, // Subnet 111.95.16.80/24
+        { subnet: "119.235.211.0", mask: 24 }, // Subnet 119.235.211.0/24
+      ];
+
+      const ipValid = validSubnets.some(({ subnet, mask }) =>
+        ipInSubnet(userIP, subnet, mask)
+      );
+
+      if (ipValid) {
+        setIsInCampus(true);
+        setWifiStatus(
+          `📍 Terdeteksi IP yang berada di dalam subnet yang diizinkan (${userIP}). Anda terhubung ke WiFi yang valid.`
+        );
+      } else {
+        setWifiStatus(
+          `❌ IP publik Anda (${userIP}) bukan dalam subnet yang diizinkan.`
+        );
+      }
+    } catch {
+      setWifiStatus("❌ Gagal memeriksa IP publik WiFi.");
+    } finally {
+      setCheckingIP(false);
+    }
   };
 
   useEffect(() => {
@@ -274,36 +284,37 @@ const AbsensiDetail = ({ params }) => {
   };
 
   const handleCapture = async () => {
-  if (!webcamRef.current || statusPresensi) {
-    alert("Anda sudah melakukan presensi.");
-    return;
-  }
+    if (!webcamRef.current || statusPresensi) {
+      alert("Anda sudah melakukan presensi.");
+      return;
+    }
 
-  const imageSrc = webcamRef.current.getScreenshot();
-  if (!imageSrc) return;
+    const imageSrc = webcamRef.current.getScreenshot();
+    if (!imageSrc) return;
 
-  setIsUploading(true);
+    setIsUploading(true);
 
-  try {
-    const timestamp = Date.now();
-    sessionStorage.setItem("ruanganImage", imageSrc);
-    sessionStorage.setItem("useCampusWifi", useCampusWifi ? "true" : "false");
+    try {
+      const timestamp = Date.now();
+      sessionStorage.setItem("ruanganImage", imageSrc);
+      sessionStorage.setItem("useCampusWifi", useCampusWifi ? "true" : "false");
 
-    // Pindah TANPA simpan apapun ke Firebase
-    router.push(
-      `/mahasiswa/face-recognition?matkul=${encodeURIComponent(
-        namaMataKuliah
-      )}&pertemuan=${encodeURIComponent(pertemuanId)}&absensi=${encodeURIComponent(
-        idAbsensi
-      )}&metode=${useCampusWifi ? "wifi" : isInCampus ? "lokasi" : "langsung"}`
-    );
-  } catch (error) {
-    alert("❌ Gagal memproses.");
-    console.error("❌ Error:", error);
-    setIsUploading(false);
-  }
-};
-
+      // Pindah TANPA simpan apapun ke Firebase
+      router.push(
+        `/mahasiswa/face-recognition?matkul=${encodeURIComponent(
+          namaMataKuliah
+        )}&pertemuan=${encodeURIComponent(
+          pertemuanId
+        )}&absensi=${encodeURIComponent(idAbsensi)}&metode=${
+          useCampusWifi ? "wifi" : isInCampus ? "lokasi" : "langsung"
+        }`
+      );
+    } catch (error) {
+      alert("❌ Gagal memproses.");
+      console.error("❌ Error:", error);
+      setIsUploading(false);
+    }
+  };
 
   if (loading) return <div className="p-8">Loading...</div>;
 

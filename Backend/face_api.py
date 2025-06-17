@@ -22,11 +22,6 @@ from deepface import DeepFace
 
 from flask_cors import CORS, cross_origin
 
-import firebase_admin
-from firebase_admin import credentials, storage
-from io import BytesIO
-import tempfile
-
 # Flask setup
 app = Flask(__name__)
 # Aktivasi CORS secara global untuk semua route
@@ -43,16 +38,6 @@ os.makedirs(DATASET_DIR, exist_ok=True)
 os.makedirs(MODEL_DIR, exist_ok=True)
 os.makedirs(EMBEDDING_DIR, exist_ok=True)
 os.makedirs(TRAINING_LOGS_DIR, exist_ok=True)
-
-cred = credentials.Certificate(os.path.join(BASE_DIR, "lib", "serviceAccountKey.json"))
-firebase_admin.initialize_app(cred, {
-    'storageBucket': 'tugas-akhir-c22c5.appspot.com'
-})
-
-bucket = storage.bucket()
-
-TMP_DIR = os.path.join(BASE_DIR, "tmp")
-os.makedirs(TMP_DIR, exist_ok=True)
 
 # Load face detectors
 detector = MTCNN()
@@ -212,48 +197,31 @@ def calculate_dynamic_threshold(embeddings):
     return max(threshold, DEFAULT_THRESHOLD)
 
 def save_embeddings(nim, embeddings):
-    # Simpan embeddings array
-    emb_buffer = BytesIO()
-    np.save(emb_buffer, embeddings)
-    emb_buffer.seek(0)
-    blob = bucket.blob(f"embeddings/{nim}.npy")
-    blob.upload_from_file(emb_buffer, content_type='application/octet-stream')
-
-    # Simpan threshold
+    """Save embeddings for a user"""
+    embedding_path = os.path.join(EMBEDDING_DIR, f"{nim}.npy")
+    np.save(embedding_path, embeddings)
+    
+    # Calculate and save threshold
     threshold = calculate_dynamic_threshold(embeddings)
-    th_buffer = BytesIO()
-    np.save(th_buffer, threshold)
-    th_buffer.seek(0)
-    threshold_blob = bucket.blob(f"embeddings/threshold_{nim}.npy")
-    threshold_blob.upload_from_file(th_buffer, content_type='application/octet-stream')
-
-    # Simpan rata-rata embedding
+    threshold_path = os.path.join(EMBEDDING_DIR, f"threshold_{nim}.npy")
+    np.save(threshold_path, threshold)
+    
+    # Calculate and save average embedding
     avg_embedding = np.mean(embeddings, axis=0)
-    avg_buffer = BytesIO()
-    np.save(avg_buffer, avg_embedding)
-    avg_buffer.seek(0)
-    avg_blob = bucket.blob(f"embeddings/avg_{nim}.npy")
-    avg_blob.upload_from_file(avg_buffer, content_type='application/octet-stream')
-
-
-
+    avg_path = os.path.join(EMBEDDING_DIR, f"avg_{nim}.npy")
+    np.save(avg_path, avg_embedding)
 
 def load_user_data():
+    """Load all user embeddings and thresholds"""
     user_data = {}
-    for blob in bucket.list_blobs(prefix="embeddings/"):
-        if blob.name.startswith("embeddings/avg_") and blob.name.endswith(".npy"):
-            nim = blob.name.split("/")[-1][4:-4]
-            avg_blob = bucket.blob(f"embeddings/avg_{nim}.npy")
-            threshold_blob = bucket.blob(f"embeddings/threshold_{nim}.npy")
-            avg_embedding = np.load(BytesIO(avg_blob.download_as_bytes()))
-            threshold = np.load(BytesIO(threshold_blob.download_as_bytes()))
+    for fname in os.listdir(EMBEDDING_DIR):
+        if fname.startswith('avg_') and fname.endswith('.npy'):
+            nim = fname[4:-4]
             user_data[nim] = {
-                "avg_embedding": avg_embedding,
-                "threshold": threshold
+                'avg_embedding': np.load(os.path.join(EMBEDDING_DIR, fname)),
+                'threshold': np.load(os.path.join(EMBEDDING_DIR, f"threshold_{nim}.npy"))
             }
-    return user_data  # <-- PENTING!
-
-
+    return user_data
 
 def get_optimal_k(n_classes):
     """
@@ -330,10 +298,7 @@ def register_face():
             # Save the cropped face
             filename = f"{pose}_{success_count+1}.jpg"
             full_path = os.path.join(path, filename)
-            img_bytes = BytesIO()
-            Image.fromarray(face_img).save(img_bytes, format='JPEG')
-            blob = bucket.blob(f"dataset/{nim}/{filename}")
-            blob.upload_from_string(img_bytes.getvalue(), content_type='image/jpeg')
+            Image.fromarray(face_img).save(full_path)
             
             # Store features
             embeddings.append(features)
@@ -374,19 +339,11 @@ def train_model():
         y = []
         
         for nim, data in user_data.items():
-            try:
-                blob = bucket.blob(f"embeddings/{nim}.npy")
-                if not blob.exists():
-                    print(f"[WARNING] embeddings/{nim}.npy not found in Firebase — skipping")
-                    continue
-
-                embedding_data = np.load(BytesIO(blob.download_as_bytes()))
-                X.extend(embedding_data)
-                y.extend([nim] * len(embedding_data))
-            except Exception as e:
-                print(f"[ERROR] Failed to load embedding for {nim}: {e}")
-
-
+            # Load all embeddings for this user
+            embeddings = np.load(os.path.join(EMBEDDING_DIR, f"{nim}.npy"))
+            X.extend(embeddings)
+            y.extend([nim] * len(embeddings))
+        
         if len(X) < 10:  # At least 10 samples total
             return jsonify({"error": "Not enough training data"}), 400
             
@@ -459,20 +416,12 @@ def train_model():
         model_path = os.path.join(MODEL_DIR, "knn_model.pkl")
         le_path = os.path.join(MODEL_DIR, "label_encoder.pkl")
         
-        def upload_model_to_firebase(obj, path):
-            with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-                joblib.dump(obj, temp_file.name)
-                blob = bucket.blob(path)
-                blob.upload_from_filename(temp_file.name)
-
-        upload_model_to_firebase(knn, "models/knn_model.pkl")
-        upload_model_to_firebase(le, "models/label_encoder.pkl")
-        upload_model_to_firebase(user_data, "models/user_data.pkl")
-
+        joblib.dump(knn, model_path)
+        joblib.dump(le, le_path)
         
         # Save user data (averages and thresholds)
         user_data_path = os.path.join(MODEL_DIR, "user_data.pkl")
-
+        joblib.dump(user_data, user_data_path)
         
         # Save training logs with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -563,14 +512,9 @@ def recognize_face():
             print(f"[ERROR] User data not found at {user_data_path}")
             return jsonify({"error": "User data missing"}), 404
             
-        def load_model_from_firebase(path):
-            blob = bucket.blob(path)
-            return joblib.load(BytesIO(blob.download_as_bytes()))
-
-        knn = load_model_from_firebase("models/knn_model.pkl")
-        le = load_model_from_firebase("models/label_encoder.pkl")
-        user_data = load_model_from_firebase("models/user_data.pkl")
-
+        knn = joblib.load(model_path)
+        le = joblib.load(le_path)
+        user_data = joblib.load(user_data_path)
         print("[DEBUG] Models loaded successfully")
         
         # Get KNN prediction

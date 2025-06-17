@@ -59,9 +59,13 @@ const DosenHomePage = () => {
       return;
     }
 
+    // Generate kode MK secara acak (4 digit angka)
+    const kodeMK = Math.floor(1000 + Math.random() * 9000); // Generate 4 digit angka acak
+
     try {
       await setDoc(doc(db, "mataKuliah", newCourseName), {
-        dosenPengampu: dosenName, // ✅ ganti field di sini
+        dosenPengampu: dosenName, // Menyimpan dosen pengampu
+        kodeMK: kodeMK, // Menyimpan kode MK
       });
 
       alert("Mata kuliah berhasil ditambahkan!");

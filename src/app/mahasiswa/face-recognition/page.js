@@ -11,6 +11,7 @@ import Footer from "@/components/Footer";
 import { db, storage } from "@/lib/firebase";
 import { doc, setDoc } from "firebase/firestore";
 import { ref, uploadBytes } from "firebase/storage";
+import Swal from "sweetalert2"; // Import SweetAlert2
 
 // Komponen utama yang menggunakan useSearchParams
 const FaceRecognitionContent = () => {
@@ -36,6 +37,27 @@ const FaceRecognitionContent = () => {
   const [error, setError] = useState(null);
   const [location, setLocation] = useState("Lokasi tidak tersedia");
   const [attempts, setAttempts] = useState(0);
+
+  // Cek apakah ada session_mahasiswa dalam cookies, jika tidak arahkan ke halaman login
+  useEffect(() => {
+    const cookie = Cookies.get("session_mahasiswa");
+    if (!cookie) {
+      // Jika cookie tidak ditemukan, redirect ke halaman login
+      Swal.fire({
+        icon: 'error',
+        title: 'Sesi Anda Berakhir',
+        text: 'Silahkan login kembali',
+        confirmButtonText: 'OK',
+      }).then(() => {
+        router.push("/mahasiswa/login");
+      });
+    } else {
+      const parsed = JSON.parse(cookie);
+      setUserNIM(parsed.nim || null);
+      setUserName(parsed.name || null);
+      setUserEmail(parsed.email || null);
+    }
+  }, [router]);
 
   // Mengambil data user dari cookies
   useEffect(() => {
@@ -217,30 +239,20 @@ const FaceRecognitionContent = () => {
               : "presensi langsung",
         });
 
-        // Log response
-        const responseLog = {
-          status: "Presensi berhasil disimpan",
-          student: {
-            nim: userNIM,
-            faceFilename: `${timestamp}.jpg`,
-            roomFilename: roomUploaded ? `${timestamp}.jpg` : null,
-            location: finalLocation,
-            presensiMethod: metodePresensi, // Menambahkan metode presensi yang sudah didefinisikan
-          },
-          time: new Date().toISOString(),
-        };
-
-        // Log keberhasilan presensi
-        console.log("Presensi Log:", JSON.stringify(responseLog, null, 2)); // Log in JSON format
-
         // Kirim notifikasi email
         await sendEmailNotification();
-        alert("Presensi berhasil. Foto tersimpan.");
-        router.push(
-          `/mahasiswa/absensi/${encodeURIComponent(
-            matkul
-          )}/${encodeURIComponent(pertemuan)}/${encodeURIComponent(absensi)}`
-        );
+        Swal.fire({
+          icon: "success",
+          title: "Presensi Berhasil",
+          text: "Silahkan cek email Anda untuk konfirmasi.",
+          confirmButtonText: "OK",
+        }).then(() => {
+          router.push(
+            `/mahasiswa/absensi/${encodeURIComponent(
+              matkul
+            )}/${encodeURIComponent(pertemuan)}/${encodeURIComponent(absensi)}`
+          );
+        });
       },
       (geoError) => {
         console.error("Geolocation gagal:", geoError);
@@ -257,12 +269,18 @@ const FaceRecognitionContent = () => {
       setHasScanned(false);
       setError(`Percobaan ${newAttempt}/5 gagal. Coba lagi!`);
     } else {
-      alert("Gagal mencocokan wajah, kembali ke halaman presensi");
-      router.push(
-        `/mahasiswa/absensi/${encodeURIComponent(matkul)}/${encodeURIComponent(
-          pertemuan
-        )}/${encodeURIComponent(absensi)}`
-      );
+      Swal.fire({
+        icon: "error",
+        title: "Gagal Mencocokkan Wajah",
+        text: "Anda telah gagal 5 kali untuk mencocokkan wajah, silahkan coba lagi nanti.",
+        confirmButtonText: "OK",
+      }).then(() => {
+        router.push(
+          `/mahasiswa/absensi/${encodeURIComponent(matkul)}/${encodeURIComponent(
+            pertemuan
+          )}/${encodeURIComponent(absensi)}`
+        );
+      });
     }
   };
 
@@ -294,7 +312,7 @@ const FaceRecognitionContent = () => {
         />
         <HeaderMahasiswaCourse
           title="2024 GANJIL | FACE RECOGNITION"
-          path={[
+          path={[ 
             "Dashboard",
             "Courses",
             "2024/2025 Ganjil",

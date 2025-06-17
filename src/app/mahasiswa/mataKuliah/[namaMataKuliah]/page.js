@@ -9,6 +9,8 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import Footer from "@/components/Footer";
 import Link from "next/link";
+import Cookies from "js-cookie"; // Import js-cookie untuk mengecek cookie session_mahasiswa
+import Swal from "sweetalert2"; // Import SweetAlert2
 
 const CourseDetail = ({ params }) => {
   const { namaMataKuliah } = params;
@@ -19,6 +21,22 @@ const CourseDetail = ({ params }) => {
   const router = useRouter();
 
   const decodedNamaMataKuliah = decodeURIComponent(namaMataKuliah);
+
+  // Cek status login menggunakan cookie session_mahasiswa
+  useEffect(() => {
+    const sessionMahasiswa = Cookies.get("session_mahasiswa"); // Ambil session cookie mahasiswa
+    if (!sessionMahasiswa) {
+      // Jika session_mahasiswa tidak ditemukan, tampilkan alert dan arahkan ke halaman login
+      Swal.fire({
+        icon: 'error',
+        title: 'Sesi Anda Berakhir',
+        text: 'Silahkan login kembali',
+        confirmButtonText: 'OK',
+      }).then(() => {
+        router.push("/mahasiswa/login"); // Redirect ke halaman login
+      });
+    }
+  }, [router]);
 
   useEffect(() => {
     const fetchCourseData = async () => {

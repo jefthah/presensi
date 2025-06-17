@@ -9,8 +9,9 @@ import SidebarMahasiswa from "@/components/SidebarMahasiswa";
 import HeaderMahasiswaCourse from "@/components/HeaderMahasiswaCourse";
 import Footer from "@/components/Footer";
 import { useRouter } from "next/navigation";
-import Cookies from "js-cookie";
+import Cookies from "js-cookie"; // Import js-cookie untuk mengecek cookie session_mahasiswa
 import Webcam from "react-webcam";
+import Swal from "sweetalert2"; // Import SweetAlert2
 
 const allowedZones = [
   {
@@ -57,6 +58,28 @@ const AbsensiDetail = ({ params }) => {
   const [useCampusWifi, setUseCampusWifi] = useState(false);
   const [metodePresensi, setMetodePresensi] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+
+  useEffect(() => {
+    const cookie = Cookies.get("session_mahasiswa");
+    if (!cookie) {
+      // Jika cookie tidak ditemukan, tampilkan SweetAlert2 dan redirect ke halaman login
+      Swal.fire({
+        icon: 'error',
+        title: 'Sesi Anda Berakhir',
+        text: 'Silahkan login kembali',
+        confirmButtonText: 'OK',
+      }).then(() => {
+        router.push("/mahasiswa/login");
+      });
+    } else {
+      try {
+        const parsed = JSON.parse(cookie);
+        setUserNIM(parsed.nim);
+      } catch (error) {
+        console.error("Error parsing session cookie", error);
+      }
+    }
+  }, [router]);
 
   const handleUseWifi = () => {
     setUseCampusWifi(true);

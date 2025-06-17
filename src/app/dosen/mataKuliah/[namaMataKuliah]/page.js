@@ -52,20 +52,19 @@ const CourseDetailPage = ({ params }) => {
   }, [decodedNamaMataKuliah]);
 
   const handleCreatePertemuan = async () => {
-    try {
-      const pertemuanRef = collection(
-        db,
-        "mataKuliah",
-        decodedNamaMataKuliah,
-        "Pertemuan"
-      );
-      const id = `Pertemuan ${topics.length + 1}`;
-      await setDoc(doc(pertemuanRef, id), { topic: "" });
-      await fetchCourseData();
-    } catch (err) {
-      console.error("Gagal tambah pertemuan:", err);
-    }
-  };
+  try {
+    const pertemuanRef = collection(db, "mataKuliah", decodedNamaMataKuliah, "Pertemuan");
+    const id = `Pertemuan ${topics.length + 1}`;
+    await setDoc(doc(pertemuanRef, id), {
+      topic: "",
+      kodeMK: courseData.kodeMK, // Menyimpan kode MK di pertemuan
+    });
+    await fetchCourseData();
+  } catch (err) {
+    console.error("Gagal tambah pertemuan:", err);
+  }
+};
+
 
   const handleAddTopic = async (id, value) => {
     try {
@@ -88,62 +87,63 @@ const CourseDetailPage = ({ params }) => {
   };
 
   const handleCreateAttendance = async (id) => {
-    const pertemuan = topics.find((t) => t.id === id);
-    if (pertemuan?.idAbsensi) {
-      alert("Presensi sudah dibuat: " + pertemuan.idAbsensi);
-      return;
+  const pertemuan = topics.find((t) => t.id === id);
+  if (pertemuan?.idAbsensi) {
+    alert("Presensi sudah dibuat: " + pertemuan.idAbsensi);
+    return;
+  }
+
+  try {
+    const now = new Date();
+    let expiredAt = null;
+    if (durasiPresensi !== "none") {
+      expiredAt = new Date(now.getTime() + Number(durasiPresensi) * 60000);
     }
 
-    try {
-      const now = new Date();
-      let expiredAt = null;
-      if (durasiPresensi !== "none") {
-        expiredAt = new Date(now.getTime() + Number(durasiPresensi) * 60000);
-      }
+    const waktu = new Intl.DateTimeFormat("id-ID", {
+      weekday: "long",
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "Asia/Jakarta",
+    }).format(now);
 
-      const waktu = new Intl.DateTimeFormat("id-ID", {
-        weekday: "long",
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-        timeZone: "Asia/Jakarta",
-      }).format(now);
+    const absensiId = `absensi-${Date.now()}`;
+    const absensiDocRef = doc(
+      db,
+      "mataKuliah",
+      decodedNamaMataKuliah,
+      "Pertemuan",
+      id,
+      "Absensi",
+      absensiId
+    );
 
-      const absensiId = `absensi-${Date.now()}`;
-      const absensiDocRef = doc(
-        db,
-        "mataKuliah",
-        decodedNamaMataKuliah,
-        "Pertemuan",
-        id,
-        "Absensi",
-        absensiId
-      );
+    await setDoc(absensiDocRef, {
+      idAbsensi: absensiId,
+      isAvailable: true,
+      date: waktu,
+      createdAt: now.toISOString(),
+      expiredAt: expiredAt ? expiredAt.toISOString() : null,
+      kodeMK: courseData.kodeMK, // Menyimpan kode MK di absensi
+    });
 
-      await setDoc(absensiDocRef, {
-        idAbsensi: absensiId,
-        isAvailable: true,
-        date: waktu,
-        createdAt: now.toISOString(),
-        expiredAt: expiredAt ? expiredAt.toISOString() : null,
-      });
+    await setDoc(
+      doc(db, "mataKuliah", decodedNamaMataKuliah, "Pertemuan", id),
+      { idAbsensi: absensiId },
+      { merge: true }
+    );
 
-      await setDoc(
-        doc(db, "mataKuliah", decodedNamaMataKuliah, "Pertemuan", id),
-        { idAbsensi: absensiId },
-        { merge: true }
-      );
-
-      alert(`Presensi berhasil dibuat!\nID: ${absensiId}`);
-      await fetchCourseData();
-    } catch (err) {
-      console.error("Gagal tambah presensi:", err);
-      alert("Gagal membuat presensi.");
-    }
-  };
+    alert(`Presensi berhasil dibuat!\nID: ${absensiId}`);
+    await fetchCourseData();
+  } catch (err) {
+    console.error("Gagal tambah presensi:", err);
+    alert("Gagal membuat presensi.");
+  }
+};
 
   const fetchAttendanceData = useCallback(
     async (pertemuanId, idAbsensi) => {

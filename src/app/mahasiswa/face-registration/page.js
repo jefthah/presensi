@@ -64,7 +64,7 @@ export default function FaceRegistrationPage() {
 
   loadCamera();
 
-  // ✅ Pasang listener
+
   window.addEventListener("popstate", handlePopState);
   document.addEventListener("visibilitychange", handleVisibilityChange);
   window.addEventListener("beforeunload", stopCamera);

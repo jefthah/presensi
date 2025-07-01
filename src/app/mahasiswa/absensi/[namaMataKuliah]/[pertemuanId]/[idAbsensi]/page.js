@@ -117,10 +117,10 @@ const AbsensiDetail = ({ params }) => {
 
       // Menambahkan subnet yang diizinkan
       const validSubnets = [
-        { subnet: "111.95.16.80", mask: 24 }, // Subnet 111.95.16.80/24
+        { subnet: "111.95.16.80", mask: 24 }, // Subnet 111.95.16.80/24 ip rumah
         { subnet: "119.235.211.0", mask: 24 },// Subnet 119.235.211.0/24
         { subnet: "103.147.92.251", mask: 24 },
-        { subnet: "180.252.173.188", mask: 24 }
+        { subnet: "180.252.173.188", mask: 24 } //ip heydar
       ];
 
       const ipValid = validSubnets.some(({ subnet, mask }) =>

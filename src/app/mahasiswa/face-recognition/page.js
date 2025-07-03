@@ -12,6 +12,8 @@ import { db, storage } from "@/lib/firebase";
 import { doc, setDoc } from "firebase/firestore";
 import { ref, uploadBytes } from "firebase/storage";
 import Swal from "sweetalert2"; // Import SweetAlert2
+import * as faceMesh from "@mediapipe/face_mesh";
+import * as cam from "@mediapipe/camera_utils";
 
 // Komponen utama yang menggunakan useSearchParams
 const FaceRecognitionContent = () => {
@@ -37,6 +39,7 @@ const FaceRecognitionContent = () => {
   const [error, setError] = useState(null);
   const [location, setLocation] = useState("Lokasi tidak tersedia");
   const [attempts, setAttempts] = useState(0);
+  const [blinkDetected, setBlinkDetected] = useState(false);
 
   // Cek apakah ada session_mahasiswa dalam cookies, jika tidak arahkan ke halaman login
   useEffect(() => {
@@ -44,10 +47,10 @@ const FaceRecognitionContent = () => {
     if (!cookie) {
       // Jika cookie tidak ditemukan, redirect ke halaman login
       Swal.fire({
-        icon: 'error',
-        title: 'Sesi Anda Berakhir',
-        text: 'Silahkan login kembali',
-        confirmButtonText: 'OK',
+        icon: "error",
+        title: "Sesi Anda Berakhir",
+        text: "Silahkan login kembali",
+        confirmButtonText: "OK",
       }).then(() => {
         router.push("/mahasiswa/login");
       });
@@ -58,6 +61,58 @@ const FaceRecognitionContent = () => {
       setUserEmail(parsed.email || null);
     }
   }, [router]);
+  useEffect(() => {
+    if (!webcamRef.current || !webcamRef.current.video) return;
+
+    const videoElement = webcamRef.current.video;
+
+    const faceMeshModel = new faceMesh.FaceMesh({
+      locateFile: (file) =>
+        `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
+    });
+
+    faceMeshModel.setOptions({
+      maxNumFaces: 1,
+      refineLandmarks: true,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5,
+    });
+
+    const onResults = (results) => {
+      if (
+        !results.multiFaceLandmarks ||
+        results.multiFaceLandmarks.length === 0
+      )
+        return;
+
+      const landmarks = results.multiFaceLandmarks[0];
+      const leftEyeTop = landmarks[159];
+      const leftEyeBottom = landmarks[145];
+
+      const eyeDist = Math.abs(leftEyeTop.y - leftEyeBottom.y);
+
+      // Jika mata tertutup (kedip), nilai eyeDist akan rendah
+      if (eyeDist < 0.015) {
+        setBlinkDetected(true);
+      }
+    };
+
+    faceMeshModel.onResults(onResults);
+
+    const camera = new cam.Camera(videoElement, {
+      onFrame: async () => {
+        await faceMeshModel.send({ image: videoElement });
+      },
+      width: 640,
+      height: 480,
+    });
+
+    camera.start();
+
+    return () => {
+      camera.stop();
+    };
+  }, []);
 
   // Mengambil data user dari cookies
   useEffect(() => {
@@ -276,9 +331,9 @@ const FaceRecognitionContent = () => {
         confirmButtonText: "OK",
       }).then(() => {
         router.push(
-          `/mahasiswa/absensi/${encodeURIComponent(matkul)}/${encodeURIComponent(
-            pertemuan
-          )}/${encodeURIComponent(absensi)}`
+          `/mahasiswa/absensi/${encodeURIComponent(
+            matkul
+          )}/${encodeURIComponent(pertemuan)}/${encodeURIComponent(absensi)}`
         );
       });
     }
@@ -286,13 +341,21 @@ const FaceRecognitionContent = () => {
 
   useEffect(() => {
     if (!userNIM || hasScanned || hasSubmitted || attempts >= 5) return;
+    if (!blinkDetected) return; // ⛔ Jangan recognize sebelum kedip
 
     const timer = setTimeout(() => {
       recognizeFace();
-    }, 3000);
+    }, 1000);
 
     return () => clearTimeout(timer);
-  }, [userNIM, hasScanned, hasSubmitted, attempts, recognizeFace]);
+  }, [
+    userNIM,
+    hasScanned,
+    hasSubmitted,
+    attempts,
+    recognizeFace,
+    blinkDetected,
+  ]);
 
   return (
     <div className="relative min-h-screen overflow-x-hidden">
@@ -312,7 +375,7 @@ const FaceRecognitionContent = () => {
         />
         <HeaderMahasiswaCourse
           title="2024 GANJIL | FACE RECOGNITION"
-          path={[ 
+          path={[
             "Dashboard",
             "Courses",
             "2024/2025 Ganjil",
@@ -334,6 +397,13 @@ const FaceRecognitionContent = () => {
                 height={300}
                 className="rounded-lg border border-gray-300"
               />
+
+              {!blinkDetected && (
+                <p className="text-blue-600 mt-2">
+                  👁 Silakan kedipkan mata agar sistem mulai memproses wajah
+                  Anda.
+                </p>
+              )}
               {hasScanned && (
                 <p className="text-sm text-gray-700 mt-4">
                   <strong>
